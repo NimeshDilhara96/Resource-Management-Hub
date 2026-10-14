@@ -1,0 +1,81 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+}
+
+enum ResourceType {
+  ROOM
+  VEHICLE
+  EQUIPMENT
+}
+
+enum ResourceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  fullName     String        @map("full_name") @db.VarChar(120)
+  email        String        @unique @db.VarChar(255)
+  passwordHash String        @map("password_hash")
+  role         UserRole      @default(EMPLOYEE)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("users")
+}
+
+model Resource {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @db.VarChar(150)
+  type         ResourceType
+  description  String?       @db.Text
+  capacity     Int?
+  location     String?       @db.VarChar(150)
+  status       ResourceStatus @default(ACTIVE)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, type])
+  @@map("resources")
+}
+
+model Reservation {
+  id         String            @id @default(uuid()) @db.Uuid
+  userId     String            @map("user_id") @db.Uuid
+  resourceId String            @map("resource_id") @db.Uuid
+  startTime  DateTime          @map("start_time") @db.Timestamptz(6)
+  endTime    DateTime          @map("end_time") @db.Timestamptz(6)
+  purpose    String            @db.VarChar(255)
+  status     ReservationStatus @default(PENDING)
+  user       User              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  resource   Resource          @relation(fields: [resourceId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId, startTime])
+  @@index([resourceId, startTime, endTime])
+  @@index([status, startTime])
+  @@map("reservations")
+}
