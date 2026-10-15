@@ -12,7 +12,6 @@ import {
   BarChart3,
   ChevronRight,
   ArrowRight,
-  RefreshCw,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -162,39 +161,20 @@ export default function AdminHubClient({
 
   return (
     <div className="space-y-6">
-      {/* Top Header & Greeting */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 mb-2">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 mb-1.5">
             <ShieldCheck size={13} className="text-slate-500" />
             <span>Admin Workspace</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             Resource Management Hub
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Logged in as <strong className="text-slate-800">{adminName}</strong>. Review reservations,
-            monitor assets, and manage company resources.
-          </p>
         </div>
 
-        {/* Quick Nav & Live Auto-Sync Indicator */}
+        {/* Quick Nav */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="hidden sm:inline">Live Auto-Sync</span>
-          </div>
-
-          <button
-            onClick={() => fetchLatest()}
-            disabled={isSyncing}
-            className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Refresh bookings now"
-          >
-            <RefreshCw size={13} className={isSyncing ? 'animate-spin text-[#ff6b35]' : 'text-slate-400'} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-
           <Link
             href="/dashboard"
             className="px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-2 transition-colors"
