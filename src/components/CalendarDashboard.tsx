@@ -23,6 +23,9 @@ import {
   ShieldCheck,
   Info,
   Wrench,
+  PackageCheck,
+  Trash2,
+  XCircle,
 } from 'lucide-react';
 import { ReservationStatus, ResourceStatus, ResourceType } from '@prisma/client';
 import { logout } from '@/actions/auth.actions';
@@ -30,6 +33,7 @@ import {
   checkAvailabilityAction,
   createReservationAction,
   cancelReservationAction,
+  adminUpdateReservationStatusAction,
 } from '@/actions/reservation.actions';
 import { formatErrorMessage } from '@/lib/utils';
 import MyReservationsModal from '@/components/MyReservationsModal';
@@ -706,7 +710,12 @@ export default function CalendarDashboard({
   const [prefilledTime, setPrefilledTime] = useState<{ start: string; end: string } | undefined>();
   const [tooltipReservation, setTooltipReservation] = useState<{ res: any; x: number; y: number } | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [adminStatusFilter, setAdminStatusFilter] = useState<'ALL' | 'PENDING'>('ALL');
   const timelineContainerRef = useRef<HTMLDivElement>(null);
+
+  const isPhysicalAsset = (type?: ResourceType) =>
+    type === ResourceType.VEHICLE || type === ResourceType.EQUIPMENT;
 
   // Sync state whenever props update
   useEffect(() => {
@@ -793,8 +802,23 @@ export default function CalendarDashboard({
     }
   }, [selectedDate]);
 
+  const pendingCount = resourcesList
+    .flatMap((r) => r.reservations || [])
+    .filter(
+      (res) =>
+        res.status === ReservationStatus.PENDING &&
+        isSameDay(fmt(res.startTime), selectedDate)
+    ).length;
+
   const filteredResources = resourcesList.filter((r) => {
     if (typeFilter !== 'ALL' && r.type !== typeFilter) return false;
+    if (session.role === 'ADMIN' && adminStatusFilter === 'PENDING') {
+      return r.reservations.some(
+        (res) =>
+          res.status === ReservationStatus.PENDING &&
+          isSameDay(fmt(res.startTime), selectedDate)
+      );
+    }
     return true;
   });
 
@@ -852,6 +876,26 @@ export default function CalendarDashboard({
     setCancellingId(null);
     setTooltipReservation(null);
     window.location.reload();
+  };
+
+  const handleAdminStatusChange = async (
+    reservationId: string,
+    newStatus: ReservationStatus
+  ) => {
+    setActionLoadingId(reservationId);
+    try {
+      const res = await adminUpdateReservationStatusAction(reservationId, newStatus);
+      if (res.success) {
+        setTooltipReservation(null);
+        await fetchTimelineLatest();
+      } else {
+        alert(res.error || 'Failed to update reservation');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error updating status');
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   const typeTabs = [
@@ -1098,20 +1142,56 @@ export default function CalendarDashboard({
                   <div />
                 )}
 
-                <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-[#ff6b35] shadow-2xs" />
-                    <span className="font-bold text-slate-800">Confirmed (Mine)</span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 border border-slate-300" />
-                    <span className="font-medium text-slate-600">Confirmed (Others)</span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border-2 border-dashed border-amber-500" />
-                    <span className="font-semibold text-amber-800">Pending Approval</span>
-                  </span>
-                </div>
+                {session.role === 'ADMIN' ? (
+                  <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                    {pendingCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAdminStatusFilter(
+                            adminStatusFilter === 'PENDING' ? 'ALL' : 'PENDING'
+                          )
+                        }
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                          adminStatusFilter === 'PENDING'
+                            ? 'bg-amber-500 text-white shadow-amber-500/20'
+                            : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
+                        }`}
+                        title="Click to toggle: Show only resources with pending requests"
+                      >
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                        <span>{pendingCount} Pending Approval</span>
+                      </button>
+                    )}
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-slate-900 shadow-2xs" />
+                      <span className="font-bold text-slate-800">Confirmed Booking</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border-2 border-dashed border-amber-500" />
+                      <span className="font-bold text-amber-800">Pending (Click to Review)</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 border border-slate-300" />
+                      <span className="font-medium text-slate-600">Concluded / Returned</span>
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-[#ff6b35] shadow-2xs" />
+                      <span className="font-bold text-slate-800">Confirmed (Mine)</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 border border-slate-300" />
+                      <span className="font-medium text-slate-600">Confirmed (Others)</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border-2 border-dashed border-amber-500" />
+                      <span className="font-semibold text-amber-800">Pending Approval</span>
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Unified Scrollable Timeline Grid */}
@@ -1379,7 +1459,7 @@ export default function CalendarDashboard({
                                 </div>
                               )}
 
-                              {/* Large, Beautiful Reservation Blocks - Differentiating Mine vs Others */}
+                              {/* Large, Beautiful Reservation Blocks - Differentiating Admin vs Employee & Mine vs Others */}
                               {reservations.map((res) => {
                                 const rawLeft = minutesToLeft(toMinutes(res.startTime), effectiveStartHour);
                                 const left = Math.max(0, rawLeft);
@@ -1388,73 +1468,135 @@ export default function CalendarDashboard({
                                 const isMine = res.user?.email === session.email || (res as any).userId === session.id;
                                 const isConfirmed = res.status === ReservationStatus.CONFIRMED;
                                 const isPending = res.status === ReservationStatus.PENDING;
+                                const isCompleted = res.status === ReservationStatus.COMPLETED;
+                                const isAdmin = session.role === 'ADMIN';
+
+                                // Determine styling with 100% role-based visual fidelity
+                                let cardClass = '';
+                                let badgeClass = '';
+                                let badgeText = '';
+                                let titleClass = '';
+                                let timeClass = '';
+                                let bookerClass = '';
+                                let bookerText = '';
+
+                                if (isAdmin) {
+                                  if (isPending) {
+                                    cardClass = 'bg-amber-50/95 text-amber-950 border-2 border-dashed border-amber-500 shadow-sm shadow-amber-500/15 ring-1 ring-amber-400/30 hover:bg-amber-100/95';
+                                    badgeClass = 'bg-amber-500 text-white font-extrabold shadow-2xs animate-pulse';
+                                    badgeText = '⏳ Needs Review';
+                                    titleClass = 'font-bold text-amber-950';
+                                    timeClass = 'text-amber-900/90 font-medium';
+                                    bookerClass = 'text-amber-800 font-semibold';
+                                    bookerText = `Booked by: ${res.user?.fullName || 'Employee'}`;
+                                  } else if (isConfirmed) {
+                                    cardClass = 'bg-slate-900 text-white border border-slate-800 shadow-sm hover:bg-slate-850 hover:shadow-md';
+                                    badgeClass = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold';
+                                    badgeText = isPhysicalAsset(resource.type) ? '✓ Active (Issued)' : '✓ Confirmed';
+                                    titleClass = 'font-bold text-white';
+                                    timeClass = 'text-slate-300 font-medium';
+                                    bookerClass = 'text-[#ff8a5c] font-semibold';
+                                    bookerText = `Booked by: ${res.user?.fullName || 'Employee'}`;
+                                  } else if (isCompleted) {
+                                    cardClass = 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-300/80 shadow-2xs';
+                                    badgeClass = isPhysicalAsset(resource.type)
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold'
+                                      : 'bg-slate-200 text-slate-700 border border-slate-300 font-semibold';
+                                    badgeText = isPhysicalAsset(resource.type) ? '✓ Returned' : '✓ Completed';
+                                    titleClass = 'font-bold text-slate-900';
+                                    timeClass = 'text-slate-600 font-medium';
+                                    bookerClass = 'text-slate-500 font-medium';
+                                    bookerText = `Booked by: ${res.user?.fullName || 'Employee'}`;
+                                  } else {
+                                    cardClass = 'bg-slate-100 text-slate-400 border border-slate-200 line-through opacity-70';
+                                    badgeClass = 'bg-slate-200 text-slate-500';
+                                    badgeText = res.status;
+                                    titleClass = 'text-slate-500 font-medium';
+                                    timeClass = 'text-slate-400 font-medium';
+                                    bookerClass = 'text-slate-400 font-medium';
+                                    bookerText = `Booked by: ${res.user?.fullName || 'Employee'}`;
+                                  }
+                                } else {
+                                  // Exact Employee logic
+                                  if (isPending) {
+                                    cardClass = isMine
+                                      ? 'bg-amber-50/95 text-amber-950 border-2 border-dashed border-amber-500 shadow-sm shadow-amber-500/15'
+                                      : 'bg-amber-50/80 text-amber-900 border-2 border-dashed border-amber-400 shadow-2xs';
+                                    badgeClass = isMine
+                                      ? 'bg-amber-500 text-white font-extrabold shadow-2xs animate-pulse flex items-center gap-1'
+                                      : 'bg-amber-200 text-amber-900 font-bold';
+                                    badgeText = isMine ? '⏳ Awaiting Approval' : '⏳ Pending';
+                                    titleClass = isMine ? 'font-bold text-amber-950' : 'font-semibold text-slate-800';
+                                    timeClass = 'text-amber-800';
+                                    bookerClass = 'text-amber-700 font-medium';
+                                    bookerText = isMine ? `You (${res.user?.fullName || session.fullName})` : (res.user?.fullName || 'Reserved');
+                                  } else if (isMine) {
+                                    if (isConfirmed) {
+                                      cardClass = 'bg-[#ff6b35] text-white border border-orange-600 shadow-sm shadow-orange-500/15';
+                                      badgeClass = 'bg-white text-[#ff6b35] font-black shadow-2xs';
+                                      badgeText = '★ Confirmed';
+                                      titleClass = 'font-bold text-white';
+                                      timeClass = 'text-white/90 font-medium';
+                                      bookerClass = 'text-white/95 font-semibold';
+                                      bookerText = `You (${res.user?.fullName || session.fullName})`;
+                                    } else {
+                                      cardClass = 'bg-slate-200 text-slate-700 border border-slate-300';
+                                      badgeClass = 'bg-slate-300 text-slate-700 font-bold';
+                                      badgeText = res.status;
+                                      titleClass = 'font-bold text-slate-900';
+                                      timeClass = 'text-slate-600 font-medium';
+                                      bookerClass = 'text-slate-500 font-medium';
+                                      bookerText = `You (${res.user?.fullName || session.fullName})`;
+                                    }
+                                  } else if (isConfirmed) {
+                                    cardClass = 'bg-slate-100 hover:bg-slate-200/80 text-slate-800 border border-slate-300/90 shadow-2xs';
+                                    badgeClass = 'bg-slate-200/90 text-slate-700 font-semibold border border-slate-300';
+                                    badgeText = 'Confirmed';
+                                    titleClass = 'font-semibold text-slate-800';
+                                    timeClass = 'text-slate-600 font-medium';
+                                    bookerClass = 'text-slate-500 font-medium';
+                                    bookerText = res.user?.fullName || 'Reserved';
+                                  } else {
+                                    cardClass = 'bg-slate-100 text-slate-600 border border-slate-200';
+                                    badgeClass = 'bg-slate-200 text-slate-600';
+                                    badgeText = res.status;
+                                    titleClass = 'font-semibold text-slate-700';
+                                    timeClass = 'text-slate-500 font-medium';
+                                    bookerClass = 'text-slate-400 font-medium';
+                                    bookerText = res.user?.fullName || 'Reserved';
+                                  }
+                                }
 
                                 return (
                                   <div
                                     key={res.id}
-                                    className={`absolute top-2.5 bottom-2.5 rounded-xl px-3 py-2 flex flex-col justify-between overflow-hidden z-10 cursor-pointer select-none transition-all duration-150 hover:scale-[1.01] hover:shadow-md ${
-                                      isPending
-                                        ? isMine
-                                          ? 'bg-amber-50/95 text-amber-950 border-2 border-dashed border-amber-500 shadow-sm shadow-amber-500/15'
-                                          : 'bg-amber-50/80 text-amber-900 border-2 border-dashed border-amber-400 shadow-2xs'
-                                        : isMine
-                                        ? isConfirmed
-                                          ? 'bg-[#ff6b35] text-white border border-orange-600 shadow-sm shadow-orange-500/15'
-                                          : 'bg-slate-200 text-slate-700 border border-slate-300'
-                                        : isConfirmed
-                                        ? 'bg-slate-100 hover:bg-slate-200/80 text-slate-800 border border-slate-300/90 shadow-2xs'
-                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                    }`}
+                                    className={`absolute top-2.5 bottom-2.5 rounded-xl px-3 py-2 flex flex-col justify-between overflow-hidden z-10 cursor-pointer select-none transition-all duration-150 hover:scale-[1.01] hover:shadow-md ${cardClass}`}
                                     style={{ left: left + 2, width: Math.max(50, width - 4) }}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setTooltipReservation({ res, x: e.clientX, y: e.clientY });
+                                      setTooltipReservation({
+                                        res: {
+                                          ...res,
+                                          resourceType: resource.type,
+                                          resourceName: resource.name,
+                                        },
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                      });
                                     }}
                                   >
                                     {/* Line 1: Status Pill & Purpose */}
                                     <div className="flex items-center gap-1.5 min-w-0">
-                                      <span
-                                        className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${
-                                          isPending
-                                            ? isMine
-                                              ? 'bg-amber-500 text-white font-extrabold shadow-2xs animate-pulse flex items-center gap-1'
-                                              : 'bg-amber-200 text-amber-900 font-bold'
-                                            : isMine
-                                            ? 'bg-white text-[#ff6b35] font-black shadow-2xs'
-                                            : 'bg-slate-200/90 text-slate-700 font-semibold'
-                                        }`}
-                                      >
-                                        {isPending
-                                          ? isMine
-                                            ? '⏳ Awaiting Approval'
-                                            : '⏳ Pending'
-                                          : isMine
-                                          ? '★ Confirmed'
-                                          : 'Confirmed'}
+                                      <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded shrink-0 ${badgeClass}`}>
+                                        {badgeText}
                                       </span>
-                                      <span
-                                        className={`text-xs leading-tight truncate ${
-                                          isPending
-                                            ? 'font-bold text-amber-950'
-                                            : isMine
-                                            ? 'font-bold text-white'
-                                            : 'font-semibold text-slate-800'
-                                        }`}
-                                      >
+                                      <span className={`text-xs leading-tight truncate ${titleClass}`}>
                                         {res.purpose}
                                       </span>
                                     </div>
 
                                     {/* Line 2: Time Range */}
-                                    <div
-                                      className={`text-[11px] font-medium flex items-center gap-1 truncate ${
-                                        isPending
-                                          ? 'text-amber-800'
-                                          : isMine
-                                          ? 'text-white/90'
-                                          : 'text-slate-600'
-                                      }`}
-                                    >
+                                    <div className={`text-[11px] flex items-center gap-1 truncate ${timeClass}`}>
                                       <Clock size={11} className="shrink-0" />
                                       <span>
                                         {fmt(res.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -1464,19 +1606,9 @@ export default function CalendarDashboard({
                                     </div>
 
                                     {/* Line 3: Booker Name */}
-                                    <div
-                                      className={`text-[10px] flex items-center gap-1 truncate ${
-                                        isPending
-                                          ? 'text-amber-700 font-medium'
-                                          : isMine
-                                          ? 'text-white/95 font-semibold'
-                                          : 'text-slate-500'
-                                      }`}
-                                    >
+                                    <div className={`text-[10px] flex items-center gap-1 truncate ${bookerClass}`}>
                                       <Users size={10} className="shrink-0" />
-                                      <span className="truncate">
-                                        {isMine ? `You (${res.user?.fullName || session.fullName})` : (res.user?.fullName || 'Reserved')}
-                                      </span>
+                                      <span className="truncate">{bookerText}</span>
                                     </div>
                                   </div>
                                 );
@@ -1543,83 +1675,195 @@ export default function CalendarDashboard({
         }}
       />
 
-      {/* ── Reservation Tooltip ── */}
+      {/* ── Reservation Tooltip / Actions Modal ── */}
       {tooltipReservation && (
         <div
           className="fixed z-50 animate-fade-in"
           style={{
-            top: Math.min(tooltipReservation.y + 8, window.innerHeight - 200),
-            left: Math.min(tooltipReservation.x + 8, window.innerWidth - 280),
+            top: Math.min(tooltipReservation.y + 8, window.innerHeight - 280),
+            left: Math.min(tooltipReservation.x + 8, window.innerWidth - 320),
           }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 w-64">
-            {(() => {
-              const isMine =
-                tooltipReservation.res.user?.email === session.email ||
-                (tooltipReservation.res as any).userId === session.id;
-              return (
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {isMine && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#ff6b35] text-white">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 w-72 sm:w-80">
+            {/* Header: Resource info & close button */}
+            <div className="flex items-start justify-between mb-2 pb-2 border-b border-slate-100">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                  {tooltipReservation.res.resourceType && (
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                      {tooltipReservation.res.resourceType}
+                    </span>
+                  )}
+                  {session.role !== 'ADMIN' &&
+                    (tooltipReservation.res.user?.email === session.email ||
+                      (tooltipReservation.res as any).userId === session.id) && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-[#ff6b35] text-white">
                         ★ My Booking
                       </span>
                     )}
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        STATUS_COLORS[tooltipReservation.res.status as ReservationStatus]
-                      }`}
-                    >
-                      {tooltipReservation.res.status === ReservationStatus.COMPLETED &&
-                      ((tooltipReservation.res as any).resource?.type === ResourceType.VEHICLE ||
-                        (tooltipReservation.res as any).resource?.type === ResourceType.EQUIPMENT)
-                        ? 'RETURNED'
-                        : tooltipReservation.res.status}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setTooltipReservation(null)}
-                    className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                  <span
+                    className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                      STATUS_COLORS[tooltipReservation.res.status as ReservationStatus]
+                    }`}
                   >
-                    <X size={14} />
-                  </button>
+                    {tooltipReservation.res.status === ReservationStatus.COMPLETED &&
+                    isPhysicalAsset(tooltipReservation.res.resourceType)
+                      ? 'RETURNED'
+                      : tooltipReservation.res.status}
+                  </span>
                 </div>
-              );
-            })()}
+                {tooltipReservation.res.resourceName && (
+                  <div className="text-xs font-bold text-slate-800 truncate">
+                    {tooltipReservation.res.resourceName}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setTooltipReservation(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Purpose */}
             <h4 className="text-sm font-bold text-slate-800 mb-1 leading-tight">
               {tooltipReservation.res.purpose}
             </h4>
-            <p className="text-xs text-slate-500 flex items-center gap-1.5 mb-1">
-              <Clock size={11} />
-              {fmt(tooltipReservation.res.startTime).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-              {' – '}
-              {fmt(tooltipReservation.res.endTime).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+
+            {/* Time range */}
+            <p className="text-xs text-slate-500 flex items-center gap-1.5 mb-2.5">
+              <Clock size={11} className="text-slate-400 shrink-0" />
+              <span>
+                {fmt(tooltipReservation.res.startTime).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+                {' – '}
+                {fmt(tooltipReservation.res.endTime).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </span>
             </p>
+
+            {/* Booker Details Card */}
             {tooltipReservation.res.user && (
-              <p className="text-xs text-slate-600 flex items-center gap-1.5 mb-3 font-medium">
-                <Users
-                  size={11}
-                  className={
-                    tooltipReservation.res.user.email === session.email ? 'text-[#ff6b35]' : 'text-slate-400'
-                  }
-                />
-                {tooltipReservation.res.user.email === session.email
-                  ? `You (${tooltipReservation.res.user.fullName})`
-                  : tooltipReservation.res.user.fullName}
-              </p>
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 mb-3">
+                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">
+                  Booked By
+                </div>
+                <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Users size={12} className="text-slate-500" />
+                  <span>
+                    {session.role !== 'ADMIN' && tooltipReservation.res.user.email === session.email
+                      ? `You (${tooltipReservation.res.user.fullName})`
+                      : tooltipReservation.res.user.fullName}
+                  </span>
+                </div>
+                {tooltipReservation.res.user.email && (
+                  <div className="text-[10px] text-slate-400 pl-4 truncate">
+                    {tooltipReservation.res.user.email}
+                  </div>
+                )}
+              </div>
             )}
-            {/* Cancel button if own or admin (ONLY if reservation has not already ended) */}
-            {tooltipReservation.res.status !== ReservationStatus.CANCELLED &&
+
+            {/* ── Actions: Admin Controls vs Employee Controls ── */}
+            {session.role === 'ADMIN' ? (
+              <div className="space-y-2 pt-1 border-t border-slate-100">
+                {/* If Pending: Admin can Approve or Reject directly from timeline */}
+                {tooltipReservation.res.status === ReservationStatus.PENDING && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={actionLoadingId === tooltipReservation.res.id}
+                      onClick={() =>
+                        handleAdminStatusChange(
+                          tooltipReservation.res.id,
+                          ReservationStatus.CONFIRMED
+                        )
+                      }
+                      className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      {actionLoadingId === tooltipReservation.res.id ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <CheckCircle2 size={13} />
+                      )}
+                      <span>Approve</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={actionLoadingId === tooltipReservation.res.id}
+                      onClick={() =>
+                        handleAdminStatusChange(
+                          tooltipReservation.res.id,
+                          ReservationStatus.CANCELLED
+                        )
+                      }
+                      className="flex-1 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-rose-200 cursor-pointer disabled:opacity-50"
+                    >
+                      <XCircle size={13} />
+                      <span>Reject</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* If Confirmed: Return (if physical) & Cancel */}
+                {tooltipReservation.res.status === ReservationStatus.CONFIRMED && (
+                  <div className="space-y-1.5">
+                    {isPhysicalAsset(tooltipReservation.res.resourceType) && (
+                      <button
+                        type="button"
+                        disabled={actionLoadingId === tooltipReservation.res.id}
+                        onClick={() =>
+                          handleAdminStatusChange(
+                            tooltipReservation.res.id,
+                            ReservationStatus.COMPLETED
+                          )
+                        }
+                        className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {actionLoadingId === tooltipReservation.res.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <PackageCheck size={13} />
+                        )}
+                        <span>Mark as Returned</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={actionLoadingId === tooltipReservation.res.id}
+                      onClick={() =>
+                        handleAdminStatusChange(
+                          tooltipReservation.res.id,
+                          ReservationStatus.CANCELLED
+                        )
+                      }
+                      className="w-full py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 border border-red-200 cursor-pointer disabled:opacity-50"
+                    >
+                      {actionLoadingId === tooltipReservation.res.id ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={12} />
+                      )}
+                      <span>Cancel Reservation</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Regular Employee cancel action (only own upcoming bookings) */
+              tooltipReservation.res.status !== ReservationStatus.CANCELLED &&
               tooltipReservation.res.status !== ReservationStatus.COMPLETED &&
               new Date(tooltipReservation.res.endTime) >= new Date() &&
-              (session.role === 'ADMIN' || tooltipReservation.res.user?.email === session.email) && (
+              tooltipReservation.res.user?.email === session.email && (
                 <button
+                  type="button"
                   onClick={() => handleCancelReservation(tooltipReservation.res.id)}
                   disabled={cancellingId === tooltipReservation.res.id}
                   className="w-full py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
@@ -1629,7 +1873,8 @@ export default function CalendarDashboard({
                   ) : null}
                   Cancel Reservation
                 </button>
-              )}
+              )
+            )}
           </div>
         </div>
       )}
