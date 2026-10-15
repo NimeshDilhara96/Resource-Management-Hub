@@ -46,12 +46,18 @@ export async function setServerSession(userId: string) {
  * Destroys session cookie on logout or security invalidation
  */
 export async function clearServerSession() {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE_NAME);
-  cookieStore.delete('user_id');
-  cookieStore.delete('user_role');
-  cookieStore.delete('user_email');
-  cookieStore.delete('user_name');
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete(SESSION_COOKIE_NAME);
+    cookieStore.delete('user_id');
+    cookieStore.delete('user_role');
+    cookieStore.delete('user_email');
+    cookieStore.delete('user_name');
+  } catch {
+    // In Next.js Server Components, cookies cannot be modified during the render phase.
+    // This is safe to ignore here because the session is treated as null,
+    // and the invalid cookie will be cleared on login, logout, or via actions.
+  }
 }
 
 /**
