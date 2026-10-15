@@ -22,6 +22,7 @@ import {
   CalendarCheck,
   ShieldCheck,
   Info,
+  Wrench,
 } from 'lucide-react';
 import { ReservationStatus, ResourceStatus, ResourceType } from '@prisma/client';
 import { logout } from '@/actions/auth.actions';
@@ -1133,14 +1134,20 @@ export default function CalendarDashboard({ resources, session }: Props) {
                           <div
                             key={resource.id}
                             className={`flex transition-colors group ${
-                              isLayerSelected ? 'bg-orange-50/20' : 'hover:bg-orange-50/15'
+                              isInactive
+                                ? 'bg-slate-100/90'
+                                : isLayerSelected
+                                ? 'bg-orange-50/20'
+                                : 'hover:bg-orange-50/15'
                             }`}
                             style={{ minHeight: 96 }}
                           >
                             {/* Sticky Left Resource Card */}
                             <div
                               className={`sticky left-0 z-20 w-60 border-r p-3.5 flex flex-col justify-between shrink-0 transition-colors shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] ${
-                                isLayerSelected
+                                isInactive
+                                  ? 'bg-slate-100 border-r-slate-300'
+                                  : isLayerSelected
                                   ? 'bg-slate-50 border-r-slate-800 ring-2 ring-inset ring-slate-800/20'
                                   : 'bg-white group-hover:bg-slate-50/70 border-slate-200 hover:border-r-slate-400'
                               }`}
@@ -1169,7 +1176,8 @@ export default function CalendarDashboard({ resources, session }: Props) {
                                   )}
                                   <div className="flex items-center gap-2 mt-1">
                                     {isInactive ? (
-                                      <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                                      <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                                        <Wrench size={10} className="text-amber-600" />
                                         Maintenance
                                       </span>
                                     ) : (
@@ -1233,12 +1241,22 @@ export default function CalendarDashboard({ resources, session }: Props) {
                                   : ''
                               } ${
                                 isInactive
-                                  ? 'bg-slate-50 cursor-not-allowed'
+                                  ? 'cursor-not-allowed select-none'
                                   : session.role === 'ADMIN'
                                   ? 'cursor-default'
                                   : 'cursor-crosshair'
                               }`}
-                              style={{ width: totalHours * HOUR_WIDTH, minHeight: 96 }}
+                              style={{
+                                width: totalHours * HOUR_WIDTH,
+                                minHeight: 96,
+                                ...(isInactive
+                                  ? {
+                                      backgroundColor: '#e2e8f0',
+                                      backgroundImage:
+                                        'repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 14px, #e2e8f0 14px, #e2e8f0 28px)',
+                                    }
+                                  : {}),
+                              }}
                               onWheel={(e) => {
                                 // Only scroll time horizontally if this resource layer is selected!
                                 if (isLayerSelected && e.deltaY !== 0) {
@@ -1255,6 +1273,15 @@ export default function CalendarDashboard({ resources, session }: Props) {
                                 }
                               }}
                             >
+                              {/* Maintenance Solid Overlay: Completely covers the track with 0 transparency and a pinned banner */}
+                              {isInactive && (
+                                <div className="absolute inset-0 z-10 flex items-center justify-start pl-6 pointer-events-none">
+                                  <div className="sticky left-64 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/95 border border-slate-300 shadow-sm text-slate-700 font-bold text-xs select-none">
+                                    <Wrench size={13} className="text-amber-500 shrink-0" />
+                                    <span>Maintenance Mode — Resource Locked</span>
+                                  </div>
+                                </div>
+                              )}
                               {/* Hour grid lines */}
                               {Array.from({ length: totalHours }, (_, i) => (
                                 <div
