@@ -1077,16 +1077,16 @@ export default function CalendarDashboard({ resources, session }: Props) {
 
                 <div className="flex items-center gap-3 text-[11px] text-slate-500">
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-[#ff6b35]" />
-                    <span className="font-bold text-slate-800">My Bookings</span>
+                    <span className="w-2.5 h-2.5 rounded-sm bg-[#ff6b35] shadow-2xs" />
+                    <span className="font-bold text-slate-800">Confirmed (Mine)</span>
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-sm bg-slate-200 border border-slate-300" />
-                    <span className="font-medium text-slate-600">Other Bookings</span>
+                    <span className="font-medium text-slate-600">Confirmed (Others)</span>
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-amber-400" />
-                    <span className="font-medium text-slate-600">Pending</span>
+                    <span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border-2 border-dashed border-amber-500" />
+                    <span className="font-semibold text-amber-800">Pending Approval</span>
                   </span>
                 </div>
               </div>
@@ -1369,16 +1369,18 @@ export default function CalendarDashboard({ resources, session }: Props) {
                                 return (
                                   <div
                                     key={res.id}
-                                    className={`absolute top-2.5 bottom-2.5 rounded-xl px-3 py-2 flex flex-col justify-between overflow-hidden z-10 cursor-pointer select-none transition-all duration-150 hover:scale-[1.01] hover:shadow-md border ${
-                                      isMine
+                                    className={`absolute top-2.5 bottom-2.5 rounded-xl px-3 py-2 flex flex-col justify-between overflow-hidden z-10 cursor-pointer select-none transition-all duration-150 hover:scale-[1.01] hover:shadow-md ${
+                                      isPending
+                                        ? isMine
+                                          ? 'bg-amber-50/95 text-amber-950 border-2 border-dashed border-amber-500 shadow-sm shadow-amber-500/15'
+                                          : 'bg-amber-50/80 text-amber-900 border-2 border-dashed border-amber-400 shadow-2xs'
+                                        : isMine
                                         ? isConfirmed
-                                          ? 'bg-[#ff6b35] text-white border-orange-600 shadow-sm shadow-orange-500/15'
-                                          : isPending
-                                          ? 'bg-amber-500 text-white border-amber-600 shadow-sm shadow-amber-500/15'
-                                          : 'bg-slate-200 text-slate-700 border-slate-300'
-                                        : isPending
-                                        ? 'bg-amber-50 text-amber-900 border border-amber-300 shadow-2xs'
-                                        : 'bg-slate-100 hover:bg-slate-200/80 text-slate-800 border border-slate-300/90 shadow-2xs'
+                                          ? 'bg-[#ff6b35] text-white border border-orange-600 shadow-sm shadow-orange-500/15'
+                                          : 'bg-slate-200 text-slate-700 border border-slate-300'
+                                        : isConfirmed
+                                        ? 'bg-slate-100 hover:bg-slate-200/80 text-slate-800 border border-slate-300/90 shadow-2xs'
+                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
                                     }`}
                                     style={{ left: left + 2, width: Math.max(50, width - 4) }}
                                     onClick={(e) => {
@@ -1390,20 +1392,46 @@ export default function CalendarDashboard({ resources, session }: Props) {
                                     <div className="flex items-center gap-1.5 min-w-0">
                                       <span
                                         className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0 ${
-                                          isMine
+                                          isPending
+                                            ? isMine
+                                              ? 'bg-amber-500 text-white font-extrabold shadow-2xs animate-pulse flex items-center gap-1'
+                                              : 'bg-amber-200 text-amber-900 font-bold'
+                                            : isMine
                                             ? 'bg-white text-[#ff6b35] font-black shadow-2xs'
-                                            : 'bg-slate-200/90 text-slate-700'
+                                            : 'bg-slate-200/90 text-slate-700 font-semibold'
                                         }`}
                                       >
-                                        {isMine ? '★ My Booking' : res.status}
+                                        {isPending
+                                          ? isMine
+                                            ? '⏳ Awaiting Approval'
+                                            : '⏳ Pending'
+                                          : isMine
+                                          ? '★ Confirmed'
+                                          : 'Confirmed'}
                                       </span>
-                                      <span className={`text-xs leading-tight truncate ${isMine ? 'font-bold' : 'font-semibold text-slate-800'}`}>
+                                      <span
+                                        className={`text-xs leading-tight truncate ${
+                                          isPending
+                                            ? 'font-bold text-amber-950'
+                                            : isMine
+                                            ? 'font-bold text-white'
+                                            : 'font-semibold text-slate-800'
+                                        }`}
+                                      >
                                         {res.purpose}
                                       </span>
                                     </div>
 
                                     {/* Line 2: Time Range */}
-                                    <div className={`text-[11px] font-medium flex items-center gap-1 truncate ${isMine ? 'opacity-90' : 'text-slate-600'}`}>
+                                    <div
+                                      className={`text-[11px] font-medium flex items-center gap-1 truncate ${
+                                        isPending
+                                          ? 'text-amber-800'
+                                          : isMine
+                                          ? 'text-white/90'
+                                          : 'text-slate-600'
+                                      }`}
+                                    >
                                       <Clock size={11} className="shrink-0" />
                                       <span>
                                         {fmt(res.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -1413,7 +1441,15 @@ export default function CalendarDashboard({ resources, session }: Props) {
                                     </div>
 
                                     {/* Line 3: Booker Name */}
-                                    <div className={`text-[10px] flex items-center gap-1 truncate ${isMine ? 'opacity-95 font-semibold' : 'text-slate-500'}`}>
+                                    <div
+                                      className={`text-[10px] flex items-center gap-1 truncate ${
+                                        isPending
+                                          ? 'text-amber-700 font-medium'
+                                          : isMine
+                                          ? 'text-white/95 font-semibold'
+                                          : 'text-slate-500'
+                                      }`}
+                                    >
                                       <Users size={10} className="shrink-0" />
                                       <span className="truncate">
                                         {isMine ? `You (${res.user?.fullName || session.fullName})` : (res.user?.fullName || 'Reserved')}
