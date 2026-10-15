@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft,
@@ -689,6 +689,7 @@ function BookingForm({
 
 // ──────────────────────── Main Calendar Dashboard ────────────────────────
 export default function CalendarDashboard({ resources, session }: Props) {
+  const [resourcesList, setResourcesList] = useState<ResourceData[]>(resources);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [typeFilter, setTypeFilter] = useState<ResourceType | 'ALL'>('ALL');
   const [bookingResource, setBookingResource] = useState<ResourceData | null>(null);
@@ -699,6 +700,39 @@ export default function CalendarDashboard({ resources, session }: Props) {
   const [tooltipReservation, setTooltipReservation] = useState<{ res: any; x: number; y: number } | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
+
+  // Sync state whenever props update
+  useEffect(() => {
+    setResourcesList(resources);
+  }, [resources]);
+
+  // Silent background real-time sync for the timeline (strictly zero text indicators, no buttons)
+  const fetchTimelineLatest = useCallback(async () => {
+    try {
+      const res = await fetch('/api/timeline', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && Array.isArray(data.resources)) {
+        setResourcesList(data.resources);
+      }
+    } catch {
+      // Silent error suppression so UI is never interrupted
+    }
+  }, []);
+
+  useEffect(() => {
+    // Poll every 3.5 seconds for instant real-time synchronization
+    const interval = setInterval(fetchTimelineLatest, 3500);
+    return () => clearInterval(interval);
+  }, [fetchTimelineLatest]);
+
+  // Keep details modals fresh with live synced data
+  useEffect(() => {
+    if (selectedResourceDetails) {
+      const fresh = resourcesList.find((r) => r.id === selectedResourceDetails.id);
+      if (fresh) setSelectedResourceDetails(fresh);
+    }
+  }, [resourcesList]);
 
   // Auto-open My Bookings modal if navigating via /my-reservations or query param ?modal=my-bookings
   useEffect(() => {
@@ -743,7 +777,7 @@ export default function CalendarDashboard({ resources, session }: Props) {
     }
   }, [selectedDate]);
 
-  const filteredResources = resources.filter((r) => {
+  const filteredResources = resourcesList.filter((r) => {
     if (typeFilter !== 'ALL' && r.type !== typeFilter) return false;
     return true;
   });
@@ -930,17 +964,17 @@ export default function CalendarDashboard({ resources, session }: Props) {
               {
                 key: ResourceType.ROOM,
                 label: 'Rooms',
-                count: resources.filter((r) => r.type === ResourceType.ROOM).length,
+                count: resourcesList.filter((r) => r.type === ResourceType.ROOM).length,
               },
               {
                 key: ResourceType.VEHICLE,
                 label: 'Vehicles',
-                count: resources.filter((r) => r.type === ResourceType.VEHICLE).length,
+                count: resourcesList.filter((r) => r.type === ResourceType.VEHICLE).length,
               },
               {
                 key: ResourceType.EQUIPMENT,
                 label: 'Equipment',
-                count: resources.filter((r) => r.type === ResourceType.EQUIPMENT).length,
+                count: resourcesList.filter((r) => r.type === ResourceType.EQUIPMENT).length,
               },
             ].map(({ key, label, count }) => (
               <div
