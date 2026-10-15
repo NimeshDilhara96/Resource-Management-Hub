@@ -11,7 +11,9 @@ export type SecurityAuditEvent =
   | 'RESERVATION_CANCELLED'
   | 'RESERVATION_STATUS_UPDATED'
   | 'SECURITY_ACCESS_DENIED'
-  | 'OBJECT_AUTH_VIOLATION';
+  | 'OBJECT_AUTH_VIOLATION'
+  | 'USER_ROLE_PROMOTED'
+  | 'USER_ROLE_DEMOTED';
 
 export interface AuditLogEntry {
   timestamp: string;

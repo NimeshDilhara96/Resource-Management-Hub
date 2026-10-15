@@ -14,10 +14,12 @@ import {
   ArrowRight,
   Sparkles,
   X,
+  Activity,
 } from 'lucide-react';
 import AdminReservationHub, { ReservationItem } from '@/components/AdminReservationHub';
 import AdminResourceManagement, { AdminResourceItem } from '@/components/AdminResourceManagement';
 import AdminInsights from '@/components/AdminInsights';
+import { UserSummary } from '@/actions/user.actions';
 
 interface AdminHubClientProps {
   analytics: {
@@ -37,14 +39,18 @@ interface AdminHubClientProps {
   };
   initialReservations: ReservationItem[];
   initialResources: AdminResourceItem[];
+  initialUsers?: UserSummary[];
   adminName: string;
+  currentAdminEmail?: string;
 }
 
 export default function AdminHubClient({
   analytics,
   initialReservations,
   initialResources,
+  initialUsers = [],
   adminName,
+  currentAdminEmail,
 }: AdminHubClientProps) {
   const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'insights'>('reservations');
 
@@ -362,7 +368,7 @@ export default function AdminHubClient({
           </span>
         </button>
 
-        {/* Tab 3: Insights & Analytics */}
+        {/* Tab 3: System Monitor & Role Access */}
         <button
           onClick={() => setActiveTab('insights')}
           className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'insights'
@@ -370,8 +376,8 @@ export default function AdminHubClient({
             : 'text-slate-600 hover:text-slate-900'
             }`}
         >
-          <BarChart3 size={14} />
-          <span>System Overview</span>
+          <Activity size={14} />
+          <span>System Monitor</span>
         </button>
       </div>
 
@@ -403,11 +409,13 @@ export default function AdminHubClient({
           </div>
         )}
 
-        {/* TAB 3: INSIGHTS */}
+        {/* TAB 3: SYSTEM MONITOR */}
         {activeTab === 'insights' && (
           <div>
             <AdminInsights
               analytics={analyticsData}
+              initialUsers={initialUsers}
+              currentAdminEmail={currentAdminEmail}
               onSwitchTab={handleSwitchTabFromInsights}
             />
           </div>

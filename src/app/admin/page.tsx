@@ -4,14 +4,38 @@ import { ReservationService } from '@/services/reservation.service';
 import Navbar from '@/components/Navbar';
 import AdminHubClient from '@/components/AdminHubClient';
 
+import prisma from '@/lib/prisma';
+
 export default async function AdminPage() {
   const session = await requireAdmin();
 
-  const [analytics, allReservations, allResources] = await Promise.all([
+  const [analytics, allReservations, allResources, allUsers] = await Promise.all([
     ResourceService.getDashboardAnalytics(),
     ReservationService.getAllReservations(),
     ResourceService.getAllResources(),
+    prisma.user.findMany({
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        _count: {
+          select: { reservations: true },
+        },
+      },
+      orderBy: [{ role: 'asc' }, { fullName: 'asc' }],
+    }),
   ]);
+
+  const formattedUsers = allUsers.map((u) => ({
+    id: u.id,
+    fullName: u.fullName,
+    email: u.email,
+    role: u.role,
+    createdAt: u.createdAt.toISOString(),
+    reservationsCount: u._count.reservations,
+  }));
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col font-sans">
@@ -22,7 +46,9 @@ export default async function AdminPage() {
           analytics={analytics}
           initialReservations={allReservations as any}
           initialResources={allResources as any}
+          initialUsers={formattedUsers}
           adminName={session.fullName}
+          currentAdminEmail={session.email}
         />
       </main>
     </div>

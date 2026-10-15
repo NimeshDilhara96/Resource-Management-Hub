@@ -75,6 +75,11 @@ export default function AdminReservationHub({
   const [dateFilter, setDateFilter] = useState(initialDateFilter);
   // Default to 'newest' so newly created bookings appear at the very top!
   const [sortBy, setSortBy] = useState<'newest' | 'pendingFirst' | 'soonest' | 'latest'>('newest');
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Sync state whenever initialReservations updates (e.g. via live background auto-sync)
   useEffect(() => {
@@ -434,7 +439,7 @@ export default function AdminReservationHub({
             const statusBadge = getStatusBadge(item.status, item.resource.type);
             const duration = getDurationHours(item.startTime, item.endTime);
             const ResourceIcon = resourceMeta.icon;
-            const isPast = new Date(item.endTime) < new Date();
+            const isPast = isMounted ? new Date(item.endTime).getTime() < Date.now() : false;
 
             return (
               <div
@@ -453,8 +458,9 @@ export default function AdminReservationHub({
                       {statusBadge.label}
                     </span>
 
-                    {/* New booking indicator if created recently and pending approval */}
-                    {item.status === ReservationStatus.PENDING &&
+                    {/* New booking indicator if created recently and pending approval (client-only after mount to avoid hydration mismatch) */}
+                    {isMounted &&
+                      item.status === ReservationStatus.PENDING &&
                       item.createdAt &&
                       Date.now() - new Date(item.createdAt).getTime() < 30 * 60 * 1000 && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#ff6b35] text-white shadow-2xs animate-pulse">
@@ -496,10 +502,10 @@ export default function AdminReservationHub({
                     {/* Date and Time */}
                     <div className="flex items-center gap-1.5 text-slate-600">
                       <Calendar size={12} className="text-slate-400" />
-                      <span>{formatDate(item.startTime)}</span>
+                      <span suppressHydrationWarning>{formatDate(item.startTime)}</span>
                       <span className="text-slate-300">•</span>
                       <Clock size={12} className="text-slate-400" />
-                      <span>
+                      <span suppressHydrationWarning>
                         {formatTime(item.startTime)} – {formatTime(item.endTime)}
                       </span>
                       <span className="text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 ml-1">
