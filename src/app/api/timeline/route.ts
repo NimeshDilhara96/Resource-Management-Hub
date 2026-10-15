@@ -1,43 +1,77 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from '@/lib/session';
+import { cookies } from 'next/headers';
+import { verifyAndDecodeSessionToken } from '@/lib/auth-crypto';
+import { SESSION_COOKIE_NAME } from '@/lib/session';
 import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const session = await getServerSession();
-    if (!session) {
+    // 1. Fast in-memory cryptographic session validation (saves 200ms+ round-trip to remote DB)
+    const cookieStore = await cookies();
+    const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    if (!token) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized: Session required' },
         { status: 401 }
       );
     }
 
-    const resourcesWithUsers = await prisma.resource.findMany({
-      include: {
-        reservations: {
-          where: {
-            status: { not: 'CANCELLED' },
-            // Include reservations for timeline navigation window
-            startTime: {
-              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-              lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            },
-          },
-          include: {
-            user: {
-              select: {
-                fullName: true,
-                email: true,
+    const decoded = verifyAndDecodeSessionToken(token);
+    if (!decoded.valid || !decoded.payload) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Invalid session' },
+        { status: 401 }
+      );
+    }
+
+    const userId = decoded.payload.userId;
+
+    // 2. Execute resource matrix & user reservation queries concurrently via Promise.all
+    const [resourcesWithUsers, userReservations] = await Promise.all([
+      prisma.resource.findMany({
+        include: {
+          reservations: {
+            where: {
+              status: { not: 'CANCELLED' },
+              startTime: {
+                gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+                lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
               },
             },
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: { startTime: 'asc' },
           },
-          orderBy: { startTime: 'asc' },
         },
-      },
-      orderBy: [{ type: 'asc' }, { name: 'asc' }],
-    });
+        orderBy: [{ type: 'asc' }, { name: 'asc' }],
+      }),
+
+      prisma.reservation.findMany({
+        where: {
+          userId,
+        },
+        include: {
+          resource: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              location: true,
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 25,
+      }),
+    ]);
 
     const now = new Date();
     const resources = resourcesWithUsers.map((r) => ({
@@ -49,26 +83,6 @@ export async function GET() {
           res.status === 'CONFIRMED'
       ),
     }));
-
-    // Fetch the authenticated user's recent reservations (all statuses: PENDING, CONFIRMED, CANCELLED, COMPLETED)
-    // to detect real-time status changes and notify employees immediately when admin approves or cancels
-    const userReservations = await prisma.reservation.findMany({
-      where: {
-        userId: session.id,
-      },
-      include: {
-        resource: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            location: true,
-          },
-        },
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: 25,
-    });
 
     return NextResponse.json({
       success: true,

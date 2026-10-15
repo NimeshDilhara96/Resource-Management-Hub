@@ -745,9 +745,29 @@ export default function CalendarDashboard({
   }, []);
 
   useEffect(() => {
-    // Poll every 3.5 seconds for instant real-time synchronization
-    const interval = setInterval(fetchTimelineLatest, 3500);
-    return () => clearInterval(interval);
+    let timeoutId: NodeJS.Timeout;
+    let isCancelled = false;
+
+    const poll = async () => {
+      // Don't flood remote DB if tab is hidden/inactive
+      if (typeof document !== 'undefined' && document.hidden) {
+        timeoutId = setTimeout(poll, 4500);
+        return;
+      }
+
+      await fetchTimelineLatest();
+
+      // Only schedule the next poll AFTER the previous request has completed
+      if (!isCancelled) {
+        timeoutId = setTimeout(poll, 4500);
+      }
+    };
+
+    timeoutId = setTimeout(poll, 4500);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [fetchTimelineLatest]);
 
   // Keep details modals fresh with live synced data
