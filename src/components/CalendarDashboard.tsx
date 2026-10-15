@@ -1773,45 +1773,51 @@ export default function CalendarDashboard({
             {/* ── Actions: Admin Controls vs Employee Controls ── */}
             {session.role === 'ADMIN' ? (
               <div className="space-y-2 pt-1 border-t border-slate-100">
-                {/* If Pending: Admin can Approve or Reject directly from timeline */}
+                {/* If Pending: Admin can Approve or Reject directly from timeline (only if not past) */}
                 {tooltipReservation.res.status === ReservationStatus.PENDING && (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={actionLoadingId === tooltipReservation.res.id}
-                      onClick={() =>
-                        handleAdminStatusChange(
-                          tooltipReservation.res.id,
-                          ReservationStatus.CONFIRMED
-                        )
-                      }
-                      className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
-                    >
-                      {actionLoadingId === tooltipReservation.res.id ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : (
-                        <CheckCircle2 size={13} />
-                      )}
-                      <span>Approve</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={actionLoadingId === tooltipReservation.res.id}
-                      onClick={() =>
-                        handleAdminStatusChange(
-                          tooltipReservation.res.id,
-                          ReservationStatus.CANCELLED
-                        )
-                      }
-                      className="flex-1 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-rose-200 cursor-pointer disabled:opacity-50"
-                    >
-                      <XCircle size={13} />
-                      <span>Reject</span>
-                    </button>
-                  </div>
+                  new Date(tooltipReservation.res.endTime) < new Date() ? (
+                    <div className="py-2 px-3 rounded-xl bg-slate-50 text-slate-500 text-xs font-medium text-center border border-slate-200/70">
+                      Booking Window Expired
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={actionLoadingId === tooltipReservation.res.id}
+                        onClick={() =>
+                          handleAdminStatusChange(
+                            tooltipReservation.res.id,
+                            ReservationStatus.CONFIRMED
+                          )
+                        }
+                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                      >
+                        {actionLoadingId === tooltipReservation.res.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <CheckCircle2 size={13} />
+                        )}
+                        <span>Approve</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actionLoadingId === tooltipReservation.res.id}
+                        onClick={() =>
+                          handleAdminStatusChange(
+                            tooltipReservation.res.id,
+                            ReservationStatus.CANCELLED
+                          )
+                        }
+                        className="flex-1 py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-rose-200 cursor-pointer disabled:opacity-50"
+                      >
+                        <XCircle size={13} />
+                        <span>Reject</span>
+                      </button>
+                    </div>
+                  )
                 )}
 
-                {/* If Confirmed: Return (if physical) & Cancel */}
+                {/* If Confirmed: Return (if physical) & Cancel (ONLY if not in the past) */}
                 {tooltipReservation.res.status === ReservationStatus.CONFIRMED && (
                   <div className="space-y-1.5">
                     {isPhysicalAsset(tooltipReservation.res.resourceType) && (
@@ -1835,24 +1841,31 @@ export default function CalendarDashboard({
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      disabled={actionLoadingId === tooltipReservation.res.id}
-                      onClick={() =>
-                        handleAdminStatusChange(
-                          tooltipReservation.res.id,
-                          ReservationStatus.CANCELLED
-                        )
-                      }
-                      className="w-full py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 border border-red-200 cursor-pointer disabled:opacity-50"
-                    >
-                      {actionLoadingId === tooltipReservation.res.id ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={12} />
-                      )}
-                      <span>Cancel Reservation</span>
-                    </button>
+                    {/* Past bookings cannot be cancelled on admin timeline */}
+                    {new Date(tooltipReservation.res.endTime) >= new Date() ? (
+                      <button
+                        type="button"
+                        disabled={actionLoadingId === tooltipReservation.res.id}
+                        onClick={() =>
+                          handleAdminStatusChange(
+                            tooltipReservation.res.id,
+                            ReservationStatus.CANCELLED
+                          )
+                        }
+                        className="w-full py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 border border-red-200 cursor-pointer disabled:opacity-50"
+                      >
+                        {actionLoadingId === tooltipReservation.res.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={12} />
+                        )}
+                        <span>Cancel Reservation</span>
+                      </button>
+                    ) : !isPhysicalAsset(tooltipReservation.res.resourceType) ? (
+                      <div className="py-2 px-3 rounded-xl bg-slate-50 text-slate-500 text-xs font-medium text-center border border-slate-200/70">
+                        Past Completed Booking
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
