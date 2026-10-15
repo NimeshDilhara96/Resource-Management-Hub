@@ -959,10 +959,10 @@ export default function CalendarDashboard({
             ) : (
               <Link
                 href="/admin"
-                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 border border-indigo-200/60 transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 transition-all flex items-center gap-1.5 shadow-2xs"
               >
-                <ShieldCheck size={14} />
-                <span className="hidden sm:inline">Admin Hub</span>
+                <ShieldCheck size={14} className="text-[#ff6b35]" />
+                <span className="hidden sm:inline">Admin Console</span>
               </Link>
             )}
           </div>

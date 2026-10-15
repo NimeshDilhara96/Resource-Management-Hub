@@ -164,25 +164,16 @@ export default function AdminHubClient({
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 mb-1.5">
-            <ShieldCheck size={13} className="text-slate-500" />
-            <span>Admin Workspace</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
             Resource Management Hub
           </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Oversee facility reservations, review employee approval requests, and monitor asset availability in real time.
+          </p>
         </div>
 
-        {/* Quick Nav */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Link
-            href="/dashboard"
-            className="px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-2 transition-colors"
-          >
-            <Calendar size={14} className="text-slate-500" />
-            <span>Timeline View</span>
-          </Link>
-        </div>
+
+
       </div>
 
       {/* Real-Time New Booking Alert Banner */}
@@ -335,20 +326,18 @@ export default function AdminHubClient({
             setReservationStatusFilter('ALL');
             setReservationDateFilter('ALL');
           }}
-          className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'reservations'
-              ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
+          className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'reservations'
+            ? 'bg-white text-slate-900 font-semibold shadow-xs'
+            : 'text-slate-600 hover:text-slate-900'
+            }`}
         >
           <CalendarCheck size={14} />
           <span>Reservations</span>
           <span
-            className={`px-1.5 py-0.2 rounded text-[10px] font-semibold ${
-              pendingCount > 0
-                ? 'bg-amber-100 text-amber-800'
-                : 'bg-slate-200 text-slate-700'
-            }`}
+            className={`px-1.5 py-0.2 rounded text-[10px] font-semibold ${pendingCount > 0
+              ? 'bg-amber-100 text-amber-800'
+              : 'bg-slate-200 text-slate-700'
+              }`}
           >
             {pendingCount > 0 ? `${pendingCount} pending` : totalReservationsCount}
           </span>
@@ -361,11 +350,10 @@ export default function AdminHubClient({
             setResourceStatusFilter('ALL');
             setResourceTypeFilter('ALL');
           }}
-          className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'resources'
-              ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
+          className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all flex items-center gap-2 cursor-pointer ${activeTab === 'resources'
+            ? 'bg-white text-slate-900 font-semibold shadow-xs'
+            : 'text-slate-600 hover:text-slate-900'
+            }`}
         >
           <Layers size={14} />
           <span>Resources</span>
@@ -377,11 +365,10 @@ export default function AdminHubClient({
         {/* Tab 3: Insights & Analytics */}
         <button
           onClick={() => setActiveTab('insights')}
-          className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'insights'
-              ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
+          className={`py-1.5 px-3.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === 'insights'
+            ? 'bg-white text-slate-900 font-semibold shadow-xs'
+            : 'text-slate-600 hover:text-slate-900'
+            }`}
         >
           <BarChart3 size={14} />
           <span>System Overview</span>
