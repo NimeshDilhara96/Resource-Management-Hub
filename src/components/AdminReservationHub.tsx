@@ -110,14 +110,13 @@ export default function AdminReservationHub({
     startTransition(async () => {
       const res = await adminUpdateReservationStatusAction(id, newStatus);
       if (res.success) {
-        setReservations((prev) => {
-          const updated = prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r));
-          if (onCountChange) {
-            const newPending = updated.filter((r) => r.status === ReservationStatus.PENDING).length;
-            onCountChange(newPending, updated.length);
-          }
-          return updated;
-        });
+        setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
+
+        if (onCountChange) {
+          const updated = reservations.map((r) => (r.id === id ? { ...r, status: newStatus } : r));
+          const newPending = updated.filter((r) => r.status === ReservationStatus.PENDING).length;
+          onCountChange(newPending, updated.length);
+        }
 
         if (onRefresh) {
           onRefresh();
@@ -541,47 +540,40 @@ export default function AdminReservationHub({
                   {/* CONFIRMED ACTIONS */}
                   {item.status === ReservationStatus.CONFIRMED && (
                     <div className="flex items-center gap-2 w-full lg:w-auto">
-                      <button
-                        onClick={() =>
-                          handleStatusChange(item.id, ReservationStatus.COMPLETED, item.resource.name)
-                        }
-                        disabled={isUpdating}
-                        className="flex-1 lg:flex-initial px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        {isUpdating ? <Loader2 size={12} className="animate-spin" /> : <CheckCheck size={13} />}
-                        <span>Complete</span>
-                      </button>
-
                       {/* Cancel button is ONLY shown for future / active reservations - NEVER for past ones */}
-                      {!isPast && (
+                      {!isPast ? (
                         !isConfirmingReject ? (
                           <button
                             onClick={() => setConfirmingRejectId(item.id)}
                             disabled={isUpdating}
-                            className="flex-1 lg:flex-initial px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            className="flex-1 lg:flex-initial px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-rose-700 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer"
                           >
-                            Cancel
+                            Cancel Booking
                           </button>
                         ) : (
                           <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
-                            <span className="text-slate-600 px-1">Cancel?</span>
+                            <span className="text-slate-600 px-1 font-medium">Cancel booking?</span>
                             <button
                               onClick={() =>
                                 handleStatusChange(item.id, ReservationStatus.CANCELLED, item.resource.name)
                               }
                               disabled={isUpdating}
-                              className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium"
+                              className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium transition-colors"
                             >
                               {isUpdating ? <Loader2 size={11} className="animate-spin" /> : 'Yes'}
                             </button>
                             <button
                               onClick={() => setConfirmingRejectId(null)}
-                              className="px-2 py-1 rounded text-slate-600 hover:bg-slate-200"
+                              className="px-2 py-1 rounded text-slate-600 hover:bg-slate-200 transition-colors"
                             >
                               No
                             </button>
                           </div>
                         )
+                      ) : (
+                        <span className="text-xs text-slate-400 px-2 py-1 font-medium">
+                          Completed (Time elapsed)
+                        </span>
                       )}
                     </div>
                   )}
