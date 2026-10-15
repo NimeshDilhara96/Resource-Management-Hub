@@ -23,9 +23,13 @@ import {
   CheckCheck,
   CalendarClock,
   Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 import { formatDate, formatTime, getDurationHours } from '@/lib/utils';
 import { ReservationStatus, ResourceType, UserRole } from '@prisma/client';
+
+const isPhysicalAsset = (type: ResourceType) =>
+  type === ResourceType.VEHICLE || type === ResourceType.EQUIPMENT;
 
 export interface ReservationItem {
   id: string;
@@ -77,8 +81,9 @@ export default function AdminReservationHub({
     setReservations(initialReservations);
   }, [initialReservations]);
 
-  // Confirmation state for reject/cancel
+  // Confirmation state for reject/cancel/return
   const [confirmingRejectId, setConfirmingRejectId] = useState<string | null>(null);
+  const [confirmingReturnId, setConfirmingReturnId] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -102,9 +107,15 @@ export default function AdminReservationHub({
   );
 
   // Status transition handler
-  const handleStatusChange = (id: string, newStatus: ReservationStatus, resourceName?: string) => {
+  const handleStatusChange = (
+    id: string,
+    newStatus: ReservationStatus,
+    resourceName?: string,
+    resourceType?: ResourceType
+  ) => {
     setUpdatingId(id);
     setConfirmingRejectId(null);
+    setConfirmingReturnId(null);
     setNotification(null);
 
     startTransition(async () => {
@@ -122,16 +133,19 @@ export default function AdminReservationHub({
           onRefresh();
         }
 
+        const isPhysical = resourceType && isPhysicalAsset(resourceType);
         const statusVerb =
           newStatus === ReservationStatus.CONFIRMED
             ? 'approved'
             : newStatus === ReservationStatus.COMPLETED
-            ? 'marked as completed'
+            ? isPhysical
+              ? 'marked as returned'
+              : 'marked as completed'
             : 'cancelled';
 
         setNotification({
           type: 'success',
-          message: `Reservation for ${resourceName || 'resource'} successfully ${statusVerb}.`,
+          message: `${resourceName || 'Resource'} was successfully ${statusVerb}.`,
         });
       } else {
         setNotification({
@@ -211,7 +225,7 @@ export default function AdminReservationHub({
   };
 
   // Professional status badge (subtle dot + muted background)
-  const getStatusBadge = (status: ReservationStatus) => {
+  const getStatusBadge = (status: ReservationStatus, type?: ResourceType) => {
     switch (status) {
       case ReservationStatus.PENDING:
         return {
@@ -221,15 +235,18 @@ export default function AdminReservationHub({
         };
       case ReservationStatus.CONFIRMED:
         return {
-          label: 'Confirmed',
+          label: type && isPhysicalAsset(type) ? 'Active (Issued)' : 'Confirmed',
           style: 'bg-emerald-50/70 text-emerald-800 border-emerald-200/70',
           dot: 'bg-emerald-500',
         };
       case ReservationStatus.COMPLETED:
         return {
-          label: 'Completed',
-          style: 'bg-slate-100 text-slate-700 border-slate-200',
-          dot: 'bg-slate-400',
+          label: type && isPhysicalAsset(type) ? 'Returned' : 'Completed',
+          style:
+            type && isPhysicalAsset(type)
+              ? 'bg-slate-100 text-emerald-800 border-emerald-200/60'
+              : 'bg-slate-100 text-slate-700 border-slate-200',
+          dot: type && isPhysicalAsset(type) ? 'bg-emerald-500' : 'bg-slate-400',
         };
       case ReservationStatus.CANCELLED:
         return {
@@ -327,7 +344,15 @@ export default function AdminReservationHub({
               { id: 'ALL', label: `All (${reservations.length})` },
               { id: 'PENDING', label: `Pending (${pendingCount})` },
               { id: 'CONFIRMED', label: `Confirmed (${confirmedCount})` },
-              { id: 'COMPLETED', label: `Completed (${completedCount})` },
+              {
+                id: 'COMPLETED',
+                label:
+                  typeFilter === 'VEHICLE' || typeFilter === 'EQUIPMENT'
+                    ? `Returned (${completedCount})`
+                    : typeFilter === 'ROOM'
+                    ? `Completed (${completedCount})`
+                    : `Returned / Completed (${completedCount})`,
+              },
               { id: 'CANCELLED', label: `Cancelled (${cancelledCount})` },
             ].map(({ id, label }) => {
               const isSelected = statusFilter === id;
@@ -404,8 +429,9 @@ export default function AdminReservationHub({
           {filtered.map((item) => {
             const isUpdating = updatingId === item.id && isPending;
             const isConfirmingReject = confirmingRejectId === item.id;
+            const isPhysical = isPhysicalAsset(item.resource.type);
             const resourceMeta = getResourceMeta(item.resource.type);
-            const statusBadge = getStatusBadge(item.status);
+            const statusBadge = getStatusBadge(item.status, item.resource.type);
             const duration = getDurationHours(item.startTime, item.endTime);
             const ResourceIcon = resourceMeta.icon;
             const isPast = new Date(item.endTime) < new Date();
@@ -495,7 +521,12 @@ export default function AdminReservationHub({
                           <>
                             <button
                               onClick={() =>
-                                handleStatusChange(item.id, ReservationStatus.CONFIRMED, item.resource.name)
+                                handleStatusChange(
+                                  item.id,
+                                  ReservationStatus.CONFIRMED,
+                                  item.resource.name,
+                                  item.resource.type
+                                )
                               }
                               disabled={isUpdating}
                               className="flex-1 lg:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
@@ -505,7 +536,10 @@ export default function AdminReservationHub({
                             </button>
 
                             <button
-                              onClick={() => setConfirmingRejectId(item.id)}
+                              onClick={() => {
+                                setConfirmingRejectId(item.id);
+                                setConfirmingReturnId(null);
+                              }}
                               disabled={isUpdating}
                               className="flex-1 lg:flex-initial px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-rose-700 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 flex items-center justify-center gap-1 transition-colors cursor-pointer"
                             >
@@ -518,7 +552,12 @@ export default function AdminReservationHub({
                             <span className="text-slate-600 px-1 font-medium">Reject booking?</span>
                             <button
                               onClick={() =>
-                                handleStatusChange(item.id, ReservationStatus.CANCELLED, item.resource.name)
+                                handleStatusChange(
+                                  item.id,
+                                  ReservationStatus.CANCELLED,
+                                  item.resource.name,
+                                  item.resource.type
+                                )
                               }
                               disabled={isUpdating}
                               className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium transition-colors"
@@ -540,49 +579,148 @@ export default function AdminReservationHub({
                   {/* CONFIRMED ACTIONS */}
                   {item.status === ReservationStatus.CONFIRMED && (
                     <div className="flex items-center gap-2 w-full lg:w-auto">
-                      {/* Cancel button is ONLY shown for future / active reservations - NEVER for past ones */}
-                      {!isPast ? (
-                        !isConfirmingReject ? (
-                          <button
-                            onClick={() => setConfirmingRejectId(item.id)}
-                            disabled={isUpdating}
-                            className="flex-1 lg:flex-initial px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-rose-700 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer"
-                          >
-                            Cancel Booking
-                          </button>
-                        ) : (
-                          <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
-                            <span className="text-slate-600 px-1 font-medium">Cancel booking?</span>
+                      {isPhysical ? (
+                        // VEHICLE & EQUIPMENT: Physical return / hand-in flow
+                        confirmingReturnId === item.id ? (
+                          <div className="flex items-center gap-1.5 bg-emerald-50 p-1 rounded-lg border border-emerald-200 text-xs">
+                            <span className="text-emerald-800 px-1 font-medium">Confirm return?</span>
                             <button
                               onClick={() =>
-                                handleStatusChange(item.id, ReservationStatus.CANCELLED, item.resource.name)
+                                handleStatusChange(
+                                  item.id,
+                                  ReservationStatus.COMPLETED,
+                                  item.resource.name,
+                                  item.resource.type
+                                )
                               }
                               disabled={isUpdating}
-                              className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium transition-colors"
+                              className="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white font-medium transition-colors"
                             >
-                              {isUpdating ? <Loader2 size={11} className="animate-spin" /> : 'Yes'}
+                              {isUpdating ? <Loader2 size={11} className="animate-spin" /> : 'Yes, Returned'}
                             </button>
                             <button
-                              onClick={() => setConfirmingRejectId(null)}
+                              onClick={() => setConfirmingReturnId(null)}
                               className="px-2 py-1 rounded text-slate-600 hover:bg-slate-200 transition-colors"
                             >
                               No
                             </button>
                           </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                setConfirmingReturnId(item.id);
+                                setConfirmingRejectId(null);
+                              }}
+                              disabled={isUpdating}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 flex items-center gap-1.5 transition-colors cursor-pointer"
+                              title="Confirm vehicle or equipment was handed back"
+                            >
+                              <RotateCcw size={12} className="text-emerald-600" />
+                              <span>Mark as Returned</span>
+                            </button>
+
+                            {!isPast && (
+                              !isConfirmingReject ? (
+                                <button
+                                  onClick={() => {
+                                    setConfirmingRejectId(item.id);
+                                    setConfirmingReturnId(null);
+                                  }}
+                                  disabled={isUpdating}
+                                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-rose-700 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer"
+                                  title="Cancel booking"
+                                >
+                                  Cancel
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
+                                  <span className="text-slate-600 px-1 font-medium">Cancel?</span>
+                                  <button
+                                    onClick={() =>
+                                      handleStatusChange(
+                                        item.id,
+                                        ReservationStatus.CANCELLED,
+                                        item.resource.name,
+                                        item.resource.type
+                                      )
+                                    }
+                                    disabled={isUpdating}
+                                    className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium transition-colors"
+                                  >
+                                    {isUpdating ? <Loader2 size={11} className="animate-spin" /> : 'Yes'}
+                                  </button>
+                                  <button
+                                    onClick={() => setConfirmingRejectId(null)}
+                                    className="px-2 py-1 rounded text-slate-600 hover:bg-slate-200 transition-colors"
+                                  >
+                                    No
+                                  </button>
+                                </div>
+                              )
+                            )}
+                          </div>
                         )
                       ) : (
-                        <span className="text-xs text-slate-400 px-2 py-1 font-medium">
-                          Completed (Time elapsed)
-                        </span>
+                        // ROOM: Naturally completed when time elapses
+                        !isPast ? (
+                          !isConfirmingReject ? (
+                            <button
+                              onClick={() => {
+                                setConfirmingRejectId(item.id);
+                                setConfirmingReturnId(null);
+                              }}
+                              disabled={isUpdating}
+                              className="flex-1 lg:flex-initial px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-rose-700 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer"
+                            >
+                              Cancel Booking
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
+                              <span className="text-slate-600 px-1 font-medium">Cancel booking?</span>
+                              <button
+                                onClick={() =>
+                                  handleStatusChange(
+                                    item.id,
+                                    ReservationStatus.CANCELLED,
+                                    item.resource.name,
+                                    item.resource.type
+                                  )
+                                }
+                                disabled={isUpdating}
+                                className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-medium transition-colors"
+                              >
+                                {isUpdating ? <Loader2 size={11} className="animate-spin" /> : 'Yes'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmingRejectId(null)}
+                                className="px-2 py-1 rounded text-slate-600 hover:bg-slate-200 transition-colors"
+                              >
+                                No
+                              </button>
+                            </div>
+                          )
+                        ) : (
+                          <span className="text-xs text-slate-400 px-2 py-1 font-medium">
+                            Completed (Time elapsed)
+                          </span>
+                        )
                       )}
                     </div>
                   )}
 
                   {/* COMPLETED */}
                   {item.status === ReservationStatus.COMPLETED && (
-                    <span className="text-xs text-slate-400 px-2 py-1 font-medium">
-                      Fulfilled
-                    </span>
+                    isPhysical ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50/80 border border-emerald-200/70 px-2.5 py-1 rounded-lg font-medium">
+                        <CheckCircle2 size={12} className="text-emerald-600" />
+                        Returned
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400 px-2 py-1 font-medium">
+                        Completed
+                      </span>
+                    )
                   )}
 
                   {/* CANCELLED */}

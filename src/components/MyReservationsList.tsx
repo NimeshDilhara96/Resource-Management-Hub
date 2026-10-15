@@ -62,8 +62,10 @@ export default function MyReservationsList({ initialReservations }: Props) {
     new Date(r.endTime) >= now && (r.status === ReservationStatus.CONFIRMED || r.status === ReservationStatus.PENDING)
   ).length;
 
-  const statusBadge = (status: ReservationStatus, endTime: Date | string) => {
+  const statusBadge = (status: ReservationStatus, endTime: Date | string, resourceType?: ResourceType) => {
     const isPast = new Date(endTime) < now;
+    const isPhysical = resourceType === ResourceType.VEHICLE || resourceType === ResourceType.EQUIPMENT;
+
     if (status === ReservationStatus.CANCELLED)
       return (
         <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
@@ -71,20 +73,46 @@ export default function MyReservationsList({ initialReservations }: Props) {
           Cancelled
         </span>
       );
-    if (status === ReservationStatus.COMPLETED || isPast)
+
+    if (status === ReservationStatus.COMPLETED)
       return (
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-          Completed
+        <span
+          className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-md border ${
+            isPhysical
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
+              : 'bg-slate-100 text-slate-600 border-slate-200'
+          }`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${isPhysical ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+          {isPhysical ? 'Returned' : 'Completed'}
         </span>
       );
-    if (status === ReservationStatus.CONFIRMED)
+
+    if (status === ReservationStatus.CONFIRMED) {
+      if (isPast) {
+        if (isPhysical) {
+          return (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Awaiting Return
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+            Completed
+          </span>
+        );
+      }
       return (
         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-slate-900 text-white">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          Confirmed
+          {isPhysical ? 'Active (Issued)' : 'Confirmed'}
         </span>
       );
+    }
+
     return (
       <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
@@ -110,7 +138,7 @@ export default function MyReservationsList({ initialReservations }: Props) {
       <div className="flex flex-wrap items-center gap-2">
         {[
           { key: 'ACTIVE', label: `Active (${activeCount})` },
-          { key: 'COMPLETED', label: 'Completed' },
+          { key: 'COMPLETED', label: 'Completed / Returned' },
           { key: 'CANCELLED', label: 'Cancelled' },
           { key: 'ALL', label: `All (${reservations.length})` },
         ].map(({ key, label }) => (
@@ -148,7 +176,7 @@ export default function MyReservationsList({ initialReservations }: Props) {
               >
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    {statusBadge(item.status, item.endTime)}
+                    {statusBadge(item.status, item.endTime, item.resource.type)}
                     <span className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                       {item.resource.type}
                     </span>

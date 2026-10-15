@@ -1412,7 +1412,11 @@ export default function CalendarDashboard({ resources, session }: Props) {
                         STATUS_COLORS[tooltipReservation.res.status as ReservationStatus]
                       }`}
                     >
-                      {tooltipReservation.res.status}
+                      {tooltipReservation.res.status === ReservationStatus.COMPLETED &&
+                      ((tooltipReservation.res as any).resource?.type === ResourceType.VEHICLE ||
+                        (tooltipReservation.res as any).resource?.type === ResourceType.EQUIPMENT)
+                        ? 'RETURNED'
+                        : tooltipReservation.res.status}
                     </span>
                   </div>
                   <button
