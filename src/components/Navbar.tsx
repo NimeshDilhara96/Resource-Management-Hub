@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { getServerSession } from '@/lib/session';
-import { logout } from '@/actions/auth.actions';
 import {
   Building2,
   Calendar,
@@ -136,7 +135,7 @@ export default async function Navbar() {
           </div>
 
           {/* Sign Out Button */}
-          <form action={logout}>
+          <form action="/api/auth/logout" method="POST">
             <button
               type="submit"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-red-600 hover:bg-red-50 border border-slate-200/90 hover:border-red-200 transition-all cursor-pointer shadow-2xs active:scale-95"

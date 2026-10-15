@@ -28,7 +28,6 @@ import {
   XCircle,
 } from 'lucide-react';
 import { ReservationStatus, ResourceStatus, ResourceType } from '@prisma/client';
-import { logout } from '@/actions/auth.actions';
 import {
   checkAvailabilityAction,
   createReservationAction,
@@ -1084,10 +1083,10 @@ export default function CalendarDashboard({
               </button>
             )}
 
-            <form action={logout}>
+            <form action="/api/auth/logout" method="POST">
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all cursor-pointer shadow-xs"
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all cursor-pointer shadow-xs active:scale-98"
               >
                 <LogOut size={14} />
                 <span>Sign Out</span>
