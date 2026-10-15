@@ -33,6 +33,7 @@ import {
 } from '@/actions/reservation.actions';
 import { formatErrorMessage } from '@/lib/utils';
 import MyReservationsModal from '@/components/MyReservationsModal';
+import NotificationCenter from '@/components/NotificationCenter';
 
 // ──────────────────────── Types ────────────────────────
 export interface ResourceData {
@@ -64,6 +65,7 @@ interface SessionUser {
 interface Props {
   resources: ResourceData[];
   session: SessionUser;
+  initialUserReservations?: any[];
 }
 
 // ──────────────────────── Helpers ────────────────────────
@@ -688,8 +690,13 @@ function BookingForm({
 }
 
 // ──────────────────────── Main Calendar Dashboard ────────────────────────
-export default function CalendarDashboard({ resources, session }: Props) {
+export default function CalendarDashboard({
+  resources,
+  session,
+  initialUserReservations = [],
+}: Props) {
   const [resourcesList, setResourcesList] = useState<ResourceData[]>(resources);
+  const [userReservations, setUserReservations] = useState<any[]>(initialUserReservations);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [typeFilter, setTypeFilter] = useState<ResourceType | 'ALL'>('ALL');
   const [bookingResource, setBookingResource] = useState<ResourceData | null>(null);
@@ -706,6 +713,12 @@ export default function CalendarDashboard({ resources, session }: Props) {
     setResourcesList(resources);
   }, [resources]);
 
+  useEffect(() => {
+    if (initialUserReservations && initialUserReservations.length > 0) {
+      setUserReservations(initialUserReservations);
+    }
+  }, [initialUserReservations]);
+
   // Silent background real-time sync for the timeline (strictly zero text indicators, no buttons)
   const fetchTimelineLatest = useCallback(async () => {
     try {
@@ -714,6 +727,9 @@ export default function CalendarDashboard({ resources, session }: Props) {
       const data = await res.json();
       if (data.success && Array.isArray(data.resources)) {
         setResourcesList(data.resources);
+      }
+      if (data.success && Array.isArray(data.userReservations)) {
+        setUserReservations(data.userReservations);
       }
     } catch {
       // Silent error suppression so UI is never interrupted
@@ -850,7 +866,7 @@ export default function CalendarDashboard({ resources, session }: Props) {
   return (
     <div className="h-screen flex flex-col bg-[#f5f6fa] font-sans overflow-hidden">
       {/* ── Top App Bar ── */}
-      <header className="flex-none bg-white border-b border-slate-200 h-14 flex items-center px-5 gap-4 z-20">
+      <header className="flex-none bg-white border-b border-slate-200 h-14 flex items-center px-5 gap-4 relative z-50 shadow-xs">
         <div className="flex items-center gap-2.5 mr-4">
           <div className="w-8 h-8 rounded-xl bg-[#ff6b35] flex items-center justify-center">
             <Building2 size={16} className="text-white" />
@@ -922,8 +938,15 @@ export default function CalendarDashboard({ resources, session }: Props) {
             </button>
           </div>
 
-          {/* Nav links: My Bookings only for Employees; Admin Hub for Admins */}
+          {/* Nav links: Notification Bell + My Bookings / Admin Hub */}
           <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200 shrink-0">
+            {/* Real-time Employee Notification Center */}
+            <NotificationCenter
+              userId={session.id}
+              userReservations={userReservations}
+              onOpenMyBookings={() => setShowMyBookingsModal(true)}
+            />
+
             {session.role !== 'ADMIN' ? (
               <button
                 type="button"

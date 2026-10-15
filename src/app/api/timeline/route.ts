@@ -50,9 +50,30 @@ export async function GET() {
       ),
     }));
 
+    // Fetch the authenticated user's recent reservations (all statuses: PENDING, CONFIRMED, CANCELLED, COMPLETED)
+    // to detect real-time status changes and notify employees immediately when admin approves or cancels
+    const userReservations = await prisma.reservation.findMany({
+      where: {
+        userId: session.id,
+      },
+      include: {
+        resource: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            location: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 25,
+    });
+
     return NextResponse.json({
       success: true,
       resources,
+      userReservations,
     });
   } catch (error: any) {
     return NextResponse.json(

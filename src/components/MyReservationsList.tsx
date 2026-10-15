@@ -81,8 +81,8 @@ export default function MyReservationsList({
 
     if (status === ReservationStatus.CANCELLED)
       return (
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
           Cancelled
         </span>
       );
@@ -119,17 +119,17 @@ export default function MyReservationsList({
         );
       }
       return (
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-slate-900 text-white">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          {isPhysical ? 'Active (Issued)' : 'Confirmed'}
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-emerald-700 text-white shadow-2xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-300" />
+          {isPhysical ? 'Approved (Issued)' : 'Approved (Confirmed)'}
         </span>
       );
     }
 
     return (
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-        Pending Approval
+        Awaiting Admin Approval
       </span>
     );
   };

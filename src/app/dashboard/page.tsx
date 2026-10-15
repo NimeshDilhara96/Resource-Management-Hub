@@ -1,17 +1,12 @@
 import { requireUser } from '@/lib/session';
 import { ResourceService } from '@/services/resource.service';
 import CalendarDashboard from '@/components/CalendarDashboard';
+import prisma from '@/lib/prisma';
 
 export default async function DashboardPage() {
   const session = await requireUser();
 
   // Fetch resources with their upcoming reservations (with user info for tooltip)
-  const resources = await ResourceService.getAllResources();
-
-  // We also need reservations with user info for the timeline
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient();
-
   const resourcesWithUsers = await prisma.resource.findMany({
     include: {
       reservations: {
@@ -37,8 +32,6 @@ export default async function DashboardPage() {
     orderBy: [{ type: 'asc' }, { name: 'asc' }],
   });
 
-  await prisma.$disconnect();
-
   // Annotate isOccupiedNow
   const now = new Date();
   const annotated = resourcesWithUsers.map(r => ({
@@ -48,10 +41,30 @@ export default async function DashboardPage() {
     ),
   }));
 
+  // Fetch initial user reservations for employee notification tracking
+  const userReservations = await prisma.reservation.findMany({
+    where: {
+      userId: session.id,
+    },
+    include: {
+      resource: {
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          location: true,
+        },
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+    take: 25,
+  });
+
   return (
     <CalendarDashboard
       resources={annotated as any}
       session={session}
+      initialUserReservations={JSON.parse(JSON.stringify(userReservations))}
     />
   );
 }
