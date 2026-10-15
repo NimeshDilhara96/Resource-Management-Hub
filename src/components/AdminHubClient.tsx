@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ShieldCheck,
@@ -12,6 +12,9 @@ import {
   BarChart3,
   ChevronRight,
   ArrowRight,
+  RefreshCw,
+  Sparkles,
+  X,
 } from 'lucide-react';
 import AdminReservationHub, { ReservationItem } from '@/components/AdminReservationHub';
 import AdminResourceManagement, { AdminResourceItem } from '@/components/AdminResourceManagement';
@@ -52,9 +55,67 @@ export default function AdminHubClient({
   const [resourceStatusFilter, setResourceStatusFilter] = useState('ALL');
   const [resourceTypeFilter, setResourceTypeFilter] = useState('ALL');
 
-  // Live counts
+  // Live state with auto-sync
+  const [reservations, setReservations] = useState<ReservationItem[]>(initialReservations);
+  const [analyticsData, setAnalyticsData] = useState(analytics);
   const [pendingCount, setPendingCount] = useState(analytics.pendingReservationsCount);
   const [totalReservationsCount, setTotalReservationsCount] = useState(initialReservations.length);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [newBookingAlert, setNewBookingAlert] = useState<{
+    userName: string;
+    resourceName: string;
+    purpose: string;
+  } | null>(null);
+
+  // Background fetch to live-sync new bookings and analytics without page reload
+  const fetchLatest = useCallback(async () => {
+    try {
+      setIsSyncing(true);
+      const res = await fetch('/api/admin/reservations', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && Array.isArray(data.reservations)) {
+        setReservations((prev) => {
+          // Detect if a brand new booking was submitted by an employee
+          const prevIds = new Set(prev.map((r) => r.id));
+          const newlyAdded = data.reservations.filter((r: ReservationItem) => !prevIds.has(r.id));
+          if (newlyAdded.length > 0) {
+            const newest = newlyAdded[0];
+            setNewBookingAlert({
+              userName: newest.user?.fullName || 'An employee',
+              resourceName: newest.resource?.name || 'Resource',
+              purpose: newest.purpose,
+            });
+          }
+          return data.reservations;
+        });
+
+        if (data.analytics) {
+          setAnalyticsData(data.analytics);
+          setPendingCount(data.analytics.pendingReservationsCount);
+          setTotalReservationsCount(data.reservations.length);
+        }
+      }
+    } catch {
+      // Ignore background fetch network interruptions
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  // Poll every 4 seconds for instant real-time updates
+  useEffect(() => {
+    const interval = setInterval(fetchLatest, 4000);
+    return () => clearInterval(interval);
+  }, [fetchLatest]);
+
+  // Auto-dismiss new booking notification after 6 seconds
+  useEffect(() => {
+    if (newBookingAlert) {
+      const timer = setTimeout(() => setNewBookingAlert(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [newBookingAlert]);
 
   const handlePendingCountChange = (newPending: number, newTotal: number) => {
     setPendingCount(newPending);
@@ -117,8 +178,23 @@ export default function AdminHubClient({
           </p>
         </div>
 
-        {/* Quick Nav Shortcut */}
-        <div className="flex items-center gap-2">
+        {/* Quick Nav & Live Auto-Sync Indicator */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="hidden sm:inline">Live Auto-Sync</span>
+          </div>
+
+          <button
+            onClick={() => fetchLatest()}
+            disabled={isSyncing}
+            className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Refresh bookings now"
+          >
+            <RefreshCw size={13} className={isSyncing ? 'animate-spin text-[#ff6b35]' : 'text-slate-400'} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+
           <Link
             href="/dashboard"
             className="px-3.5 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold flex items-center gap-2 transition-colors"
@@ -129,7 +205,39 @@ export default function AdminHubClient({
         </div>
       </div>
 
-      {/* KPI Cards: Uniform, Clean, Professional */}
+      {/* Real-Time New Booking Alert Banner */}
+      {newBookingAlert && (
+        <div className="p-3.5 bg-orange-50 border border-orange-200 rounded-xl flex items-center justify-between gap-3 text-xs animate-fade-in shadow-xs">
+          <div className="flex items-center gap-2 text-slate-800">
+            <span className="w-2 h-2 rounded-full bg-[#ff6b35] animate-ping" />
+            <span>
+              <strong>New Booking Received!</strong> {newBookingAlert.userName} booked{' '}
+              <strong className="text-[#ff6b35]">{newBookingAlert.resourceName}</strong> for &quot;
+              {newBookingAlert.purpose}&quot;.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setActiveTab('reservations');
+                setReservationStatusFilter('ALL');
+                setNewBookingAlert(null);
+              }}
+              className="text-xs font-bold text-[#ff6b35] hover:underline cursor-pointer"
+            >
+              View at Top →
+            </button>
+            <button
+              onClick={() => setNewBookingAlert(null)}
+              className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* KPI Cards: Live & Responsive */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Card 1: Total Resources */}
         <button
@@ -143,10 +251,12 @@ export default function AdminHubClient({
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900">
-            {analytics.totalResources}
+            {analyticsData.totalResources}
           </div>
           <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-            <span>{analytics.byType.ROOM} Rooms · {analytics.byType.VEHICLE} Vehicles · {analytics.byType.EQUIPMENT} Tech</span>
+            <span>
+              {analyticsData.byType.ROOM} Rooms · {analyticsData.byType.VEHICLE} Vehicles · {analyticsData.byType.EQUIPMENT} Tech
+            </span>
             <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 text-slate-400 transition-opacity" />
           </div>
         </button>
@@ -163,10 +273,10 @@ export default function AdminHubClient({
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900">
-            {analytics.statusSummary.active}
+            {analyticsData.statusSummary.active}
           </div>
           <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-            <span>{analytics.statusSummary.inactive} in maintenance</span>
+            <span>{analyticsData.statusSummary.inactive} in maintenance</span>
             <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 text-slate-400 transition-opacity" />
           </div>
         </button>
@@ -183,10 +293,10 @@ export default function AdminHubClient({
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900">
-            {analytics.todayReservationsCount}
+            {analyticsData.todayReservationsCount}
           </div>
           <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-            <span>{analytics.upcomingReservationsCount} upcoming total</span>
+            <span>{analyticsData.upcomingReservationsCount} upcoming total</span>
             <ChevronRight size={12} className="opacity-0 group-hover:opacity-100 text-slate-400 transition-opacity" />
           </div>
         </button>
@@ -280,7 +390,7 @@ export default function AdminHubClient({
           <Layers size={14} />
           <span>Resources</span>
           <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-200 text-slate-700">
-            {analytics.totalResources}
+            {analyticsData.totalResources}
           </span>
         </button>
 
@@ -305,10 +415,11 @@ export default function AdminHubClient({
           <div className="space-y-3">
             <AdminReservationHub
               key={`${reservationStatusFilter}-${reservationDateFilter}`}
-              initialReservations={initialReservations}
+              initialReservations={reservations}
               initialStatusFilter={reservationStatusFilter}
               initialDateFilter={reservationDateFilter}
               onCountChange={handlePendingCountChange}
+              onRefresh={fetchLatest}
             />
           </div>
         )}
@@ -329,7 +440,7 @@ export default function AdminHubClient({
         {activeTab === 'insights' && (
           <div>
             <AdminInsights
-              analytics={analytics}
+              analytics={analyticsData}
               onSwitchTab={handleSwitchTabFromInsights}
             />
           </div>

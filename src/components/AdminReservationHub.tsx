@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useMemo } from 'react';
+import { useState, useTransition, useMemo, useEffect } from 'react';
 import { adminUpdateReservationStatusAction } from '@/actions/reservation.actions';
 import {
   CheckCircle2,
@@ -22,6 +22,7 @@ import {
   AlertCircle,
   CheckCheck,
   CalendarClock,
+  Sparkles,
 } from 'lucide-react';
 import { formatDate, formatTime, getDurationHours } from '@/lib/utils';
 import { ReservationStatus, ResourceType, UserRole } from '@prisma/client';
@@ -32,6 +33,8 @@ export interface ReservationItem {
   endTime: Date | string;
   purpose: string;
   status: ReservationStatus;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
   resource: {
     id: string;
     name: string;
@@ -51,6 +54,7 @@ interface AdminReservationHubProps {
   initialStatusFilter?: string;
   initialDateFilter?: string;
   onCountChange?: (pendingCount: number, totalCount: number) => void;
+  onRefresh?: () => Promise<void> | void;
 }
 
 export default function AdminReservationHub({
@@ -58,13 +62,20 @@ export default function AdminReservationHub({
   initialStatusFilter = 'ALL',
   initialDateFilter = 'ALL',
   onCountChange,
+  onRefresh,
 }: AdminReservationHubProps) {
   const [reservations, setReservations] = useState<ReservationItem[]>(initialReservations);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [dateFilter, setDateFilter] = useState(initialDateFilter);
-  const [sortBy, setSortBy] = useState<'soonest' | 'latest'>('soonest');
+  // Default to 'newest' so newly created bookings appear at the very top!
+  const [sortBy, setSortBy] = useState<'newest' | 'pendingFirst' | 'soonest' | 'latest'>('newest');
+
+  // Sync state whenever initialReservations updates (e.g. via live background auto-sync)
+  useEffect(() => {
+    setReservations(initialReservations);
+  }, [initialReservations]);
 
   // Confirmation state for reject/cancel
   const [confirmingRejectId, setConfirmingRejectId] = useState<string | null>(null);
@@ -107,6 +118,10 @@ export default function AdminReservationHub({
           }
           return updated;
         });
+
+        if (onRefresh) {
+          onRefresh();
+        }
 
         const statusVerb =
           newStatus === ReservationStatus.CONFIRMED
@@ -165,6 +180,19 @@ export default function AdminReservationHub({
         return true;
       })
       .sort((a, b) => {
+        // Newest Created First (aluthin booking top walta enna hadanna)
+        if (sortBy === 'newest') {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.startTime).getTime();
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.startTime).getTime();
+          return timeB - timeA;
+        }
+        if (sortBy === 'pendingFirst') {
+          if (a.status === ReservationStatus.PENDING && b.status !== ReservationStatus.PENDING) return -1;
+          if (b.status === ReservationStatus.PENDING && a.status !== ReservationStatus.PENDING) return 1;
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.startTime).getTime();
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.startTime).getTime();
+          return timeB - timeA;
+        }
         const timeA = new Date(a.startTime).getTime();
         const timeB = new Date(b.startTime).getTime();
         return sortBy === 'soonest' ? timeA - timeB : timeB - timeA;
@@ -285,8 +313,10 @@ export default function AdminReservationHub({
               onChange={(e) => setSortBy(e.target.value as any)}
               className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-400 cursor-pointer"
             >
-              <option value="soonest">Earliest First</option>
-              <option value="latest">Latest First</option>
+              <option value="newest">Newest Bookings First</option>
+              <option value="pendingFirst">Pending Approval First</option>
+              <option value="soonest">Earliest Schedule Time</option>
+              <option value="latest">Latest Schedule Time</option>
             </select>
           </div>
         </div>
@@ -397,6 +427,16 @@ export default function AdminReservationHub({
                       <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`} />
                       {statusBadge.label}
                     </span>
+
+                    {/* New booking indicator if created recently and pending approval */}
+                    {item.status === ReservationStatus.PENDING &&
+                      item.createdAt &&
+                      Date.now() - new Date(item.createdAt).getTime() < 30 * 60 * 1000 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#ff6b35] text-white shadow-2xs animate-pulse">
+                          <Sparkles size={10} />
+                          New Request
+                        </span>
+                      )}
 
                     {/* Category & Resource Tag (Clean neutral slate) */}
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200/80">
