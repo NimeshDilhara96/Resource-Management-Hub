@@ -283,7 +283,7 @@ export class ReservationService {
           },
         },
       },
-      orderBy: { startTime: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
