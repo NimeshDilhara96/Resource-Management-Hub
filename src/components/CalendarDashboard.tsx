@@ -31,6 +31,7 @@ import {
   cancelReservationAction,
 } from '@/actions/reservation.actions';
 import { formatErrorMessage } from '@/lib/utils';
+import MyReservationsModal from '@/components/MyReservationsModal';
 
 // ──────────────────────── Types ────────────────────────
 export interface ResourceData {
@@ -691,11 +692,23 @@ export default function CalendarDashboard({ resources, session }: Props) {
   const [typeFilter, setTypeFilter] = useState<ResourceType | 'ALL'>('ALL');
   const [bookingResource, setBookingResource] = useState<ResourceData | null>(null);
   const [selectedResourceDetails, setSelectedResourceDetails] = useState<ResourceData | null>(null);
+  const [showMyBookingsModal, setShowMyBookingsModal] = useState(false);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [prefilledTime, setPrefilledTime] = useState<{ start: string; end: string } | undefined>();
   const [tooltipReservation, setTooltipReservation] = useState<{ res: any; x: number; y: number } | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const timelineContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-open My Bookings modal if navigating via /my-reservations or query param ?modal=my-bookings
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('modal') === 'my-bookings' || params.get('view') === 'my-bookings') {
+        setShowMyBookingsModal(true);
+        window.history.replaceState({}, '', '/dashboard');
+      }
+    }
+  }, []);
 
   const now = new Date();
   const isEmployee = session.role !== 'ADMIN';
@@ -877,13 +890,14 @@ export default function CalendarDashboard({ resources, session }: Props) {
           {/* Nav links: My Bookings only for Employees; Admin Hub for Admins */}
           <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200 shrink-0">
             {session.role !== 'ADMIN' ? (
-              <Link
-                href="/my-reservations"
-                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5"
+              <button
+                type="button"
+                onClick={() => setShowMyBookingsModal(true)}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <CalendarCheck size={14} className="text-[#ff6b35]" />
                 <span className="hidden sm:inline">My Bookings</span>
-              </Link>
+              </button>
             ) : (
               <Link
                 href="/admin"
@@ -956,6 +970,17 @@ export default function CalendarDashboard({ resources, session }: Props) {
                 <div className="text-[10px] text-slate-400 font-medium">{session.role}</div>
               </div>
             </div>
+
+            {session.role !== 'ADMIN' && (
+              <button
+                type="button"
+                onClick={() => setShowMyBookingsModal(true)}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer shadow-2xs"
+              >
+                <CalendarCheck size={14} className="text-[#ff6b35]" />
+                <span>My Bookings</span>
+              </button>
+            )}
 
             <form action={logout}>
               <button
@@ -1384,6 +1409,19 @@ export default function CalendarDashboard({ resources, session }: Props) {
           }}
         />
       )}
+
+      {/* ── My Reservations Popup Modal ── */}
+      <MyReservationsModal
+        isOpen={showMyBookingsModal}
+        onClose={() => setShowMyBookingsModal(false)}
+        onBookNew={() => {
+          setShowMyBookingsModal(false);
+          setBookingResource(filteredResources[0] || null);
+        }}
+        onReservationCancelled={() => {
+          window.location.reload();
+        }}
+      />
 
       {/* ── Reservation Tooltip ── */}
       {tooltipReservation && (

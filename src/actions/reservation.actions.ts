@@ -301,3 +301,27 @@ export async function adminUpdateReservationStatusAction(
     };
   }
 }
+
+/**
+ * Fetches all reservations for the currently authenticated user
+ */
+export async function getMyReservationsAction(): Promise<{
+  success: boolean;
+  reservations: any[];
+  error?: string;
+}> {
+  try {
+    const session = await requireUser();
+    const reservations = await ReservationService.getUserReservations(session.id);
+    return {
+      success: true,
+      reservations: JSON.parse(JSON.stringify(reservations)),
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      reservations: [],
+      error: formatErrorMessage(error),
+    };
+  }
+}

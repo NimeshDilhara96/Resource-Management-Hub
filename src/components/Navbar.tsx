@@ -36,7 +36,7 @@ export default async function Navbar() {
         </Link>
         {!isAdmin && (
           <Link
-            href="/my-reservations"
+            href="/dashboard?modal=my-bookings"
             className="px-3.5 py-2 rounded-xl text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
             My Bookings

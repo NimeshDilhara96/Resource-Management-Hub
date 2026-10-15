@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Calendar, Clock, Users, CheckCircle2, Clock3, XCircle, Trash2, Loader2, MapPin } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Calendar, Clock, Users, CheckCircle2, Clock3, XCircle, Trash2, Loader2, MapPin, Plus } from 'lucide-react';
 import { formatTimeRange } from '@/lib/utils';
 import { ReservationStatus, ResourceType } from '@prisma/client';
 import { cancelReservationAction } from '@/actions/reservation.actions';
@@ -23,13 +23,23 @@ interface ReservationItem {
 
 interface Props {
   initialReservations: ReservationItem[];
+  onReservationCancelled?: (id: string) => void;
+  onBookNew?: () => void;
 }
 
-export default function MyReservationsList({ initialReservations }: Props) {
+export default function MyReservationsList({
+  initialReservations,
+  onReservationCancelled,
+  onBookNew,
+}: Props) {
   const [reservations, setReservations] = useState(initialReservations);
   const [filterTab, setFilterTab] = useState('ACTIVE');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    setReservations(initialReservations);
+  }, [initialReservations]);
 
   const now = new Date();
 
@@ -52,6 +62,9 @@ export default function MyReservationsList({ initialReservations }: Props) {
     if (res.success) {
       setReservations(prev => prev.map(r => r.id === id ? { ...r, status: ReservationStatus.CANCELLED } : r));
       setActionMsg({ type: 'success', text: 'Reservation cancelled successfully.' });
+      if (onReservationCancelled) {
+        onReservationCancelled(id);
+      }
     } else {
       setActionMsg({ type: 'error', text: res.error || 'Failed to cancel.' });
     }
@@ -158,10 +171,19 @@ export default function MyReservationsList({ initialReservations }: Props) {
 
       {/* List */}
       {filtered.length === 0 ? (
-        <div className="py-16 text-center rounded-2xl bg-white border border-slate-200 border-dashed">
-          <Calendar size={36} className="mx-auto text-slate-300 mb-3" />
-          <p className="text-sm font-semibold text-slate-500">No reservations in this section</p>
-          <p className="text-xs text-slate-400 mt-1">Go to the Timeline to book resources.</p>
+        <div className="py-12 text-center rounded-2xl bg-white border border-slate-200 border-dashed p-6">
+          <Calendar size={32} className="mx-auto text-slate-300 mb-2" />
+          <p className="text-xs font-semibold text-slate-700">No reservations in this section</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Go to the Timeline to book resources.</p>
+          {onBookNew && (
+            <button
+              onClick={onBookNew}
+              className="mt-3 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-[#ff6b35] hover:bg-[#e55a25] transition-colors cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <Plus size={13} />
+              <span>Book a Resource</span>
+            </button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
